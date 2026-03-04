@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Robo Dirosky</string>
+    <string name="settings">Configurações</string>
+    <string name="notification_channel_alerts">Alertas de Aposta</string>
+    <string name="notification_channel_results">Resultados</string>
+    <string name="notification_channel_service">Monitoramento</string>
+</resources>
