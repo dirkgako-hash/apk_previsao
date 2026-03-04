@@ -14,14 +14,14 @@ interface JogoDao {
     @Query("SELECT * FROM jogos WHERE data = :data AND status NOT IN ('Ended', 'Canceled', 'Postponed')")
     suspend fun getJogosAtivos(data: String): List<JogoEntity>
     
-    @Query("UPDATE jogos SET status = :status, minutoLive = :minuto, scoreLive = :score WHERE eventId = :eventId")
-    suspend fun updateLiveStatus(eventId: String, status: String, minuto: Int, score: String)
+    @Query("UPDATE jogos SET status = :status, minutoLive = :minutoLive, scoreLive = :scoreLive WHERE eventId = :eventId")
+    suspend fun updateLiveStatus(eventId: String, status: String, minutoLive: Int, scoreLive: String)
     
     @Query("UPDATE jogos SET kickTs = :kickTs WHERE eventId = :eventId")
     suspend fun updateKickTs(eventId: String, kickTs: String)
     
-    @Query("UPDATE jogos SET alertaLive = :alerta, oddLive = :odd, logId = :logId WHERE eventId = :eventId")
-    suspend fun updateAlerta(eventId: String, alerta: Boolean, odd: Double, logId: Long)
+    @Query("UPDATE jogos SET alertaLive = :alertaLive, oddLive = :oddLive, logId = :logId WHERE eventId = :eventId")
+    suspend fun updateAlerta(eventId: String, alertaLive: Boolean, oddLive: Double, logId: Long)
     
     @Query("UPDATE jogos SET htScore = :htScore WHERE eventId = :eventId")
     suspend fun updateHtScore(eventId: String, htScore: String)
