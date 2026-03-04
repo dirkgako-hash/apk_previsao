@@ -1,0 +1,120 @@
+name: Android Build Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+        
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      
+      - name: Install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+      
+      - name: Generate Android Icons
+        run: |
+          echo "Generating Android icons..."
+          mkdir -p app/src/main/res/mipmap-hdpi
+          mkdir -p app/src/main/res/mipmap-mdpi
+          mkdir -p app/src/main/res/mipmap-xhdpi
+          mkdir -p app/src/main/res/mipmap-xxhdpi
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          
+          if command -v convert &> /dev/null; then
+            echo "Using ImageMagick to create icons..."
+            for density in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
+              case $density in
+                mdpi) size="48" ;;
+                hdpi) size="72" ;;
+                xhdpi) size="96" ;;
+                xxhdpi) size="144" ;;
+                xxxhdpi) size="192" ;;
+              esac
+              convert -size ${size}x${size} xc:"#2196F3" -fill "#FFFFFF" -gravity center -pointsize $(($size/3)) -annotate 0 "MS" "app/src/main/res/mipmap-$density/ic_launcher.png"
+              cp "app/src/main/res/mipmap-$density/ic_launcher.png" "app/src/main/res/mipmap-$density/ic_launcher_round.png"
+            done
+          else
+            echo "ImageMagick not available, creating placeholders..."
+            for density in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
+              echo -n "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" | base64 -d > "app/src/main/res/mipmap-$density/ic_launcher.png"
+              cp "app/src/main/res/mipmap-$density/ic_launcher.png" "app/src/main/res/mipmap-$density/ic_launcher_round.png"
+            done
+          fi
+      
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      
+      - name: Create Release Keystore
+        run: |
+          echo "Creating release keystore..."
+          keytool -genkeypair \
+            -keystore multistreamviewer.jks \
+            -alias key0 \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass 458080 \
+            -keypass 458080 \
+            -dname "CN=Android, OU=Android, O=Android, L=City, ST=State, C=US" \
+            -noprompt
+          
+          echo "storePassword=458080" > keystore.properties
+          echo "keyPassword=458080" >> keystore.properties
+          echo "keyAlias=key0" >> keystore.properties
+          echo "storeFile=../multistreamviewer.jks" >> keystore.properties
+          
+          echo "✓ Release keystore and properties created!"
+          echo "keystore.properties content:"
+          cat keystore.properties
+      
+      - name: Verify Keystore Files
+        run: |
+          echo "=== Verifying created files ==="
+          ls -la multistreamviewer.jks keystore.properties
+          echo ""
+          echo "=== keystore.properties content ==="
+          cat keystore.properties
+      
+      - name: Build Release APK
+        run: |
+          echo "VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
+          echo "VERSION_NAME=1.0.${{ github.run_number }}" >> $GITHUB_ENV
+
+          ./gradlew assembleRelease --stacktrace
+          echo "✓ Release APK built successfully!"
+      
+      - name: Verify Release APK
+        run: |
+          echo "=== Generated Release APK ==="
+          find app/build -name "*MULTIBOX-DIROSKY*.apk" -type f | xargs -I {} sh -c 'echo "{} - $(du -h {} | cut -f1)"'
+          
+          echo ""
+          echo "=== Verifying signature ==="
+          for apk in app/build/outputs/apk/release/*.apk; do
+            echo "Verifying $apk..."
+            apksigner verify --verbose "$apk" 2>/dev/null || jarsigner -verify -verbose "$apk" 2>/dev/null || echo "⚠️ Could not verify signature for $apk"
+          done
+      
+      - name: Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MultiBox_DIROSKY-Release
+          path: app/build/outputs/apk/release/
+          if-no-files-found: error
+          retention-days: 30
