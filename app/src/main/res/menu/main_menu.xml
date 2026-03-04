@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    
+    <item
+        android:id="@+id/action_refresh"
+        android:icon="@android:drawable/ic_menu_rotate"
+        android:title="Atualizar"
+        app:showAsAction="ifRoom" />
+    
+    <item
+        android:id="@+id/action_filter"
+        android:icon="@android:drawable/ic_menu_search"
+        android:title="Filtrar">
+        <menu>
+            <item
+                android:id="@+id/filter_all"
+                android:title="Todos os níveis" />
+            <item
+                android:id="@+id/filter_a"
+                android:title="🔥 Nível A (FORTE)" />
+            <item
+                android:id="@+id/filter_b"
+                android:title="🔵 Nível B (BOM)" />
+            <item
+                android:id="@+id/filter_c"
+                android:title="📊 Nível C (BASE)" />
+        </menu>
+    </item>
+    
+    <item
+        android:id="@+id/action_stats"
+        android:title="Estatísticas" />
+    
+    <item
+        android:id="@+id/action_settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="Configurações"
+        app:showAsAction="never" />
+</menu>
