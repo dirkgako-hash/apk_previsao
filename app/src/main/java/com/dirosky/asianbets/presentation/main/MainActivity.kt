@@ -7,6 +7,8 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -18,6 +20,8 @@ import androidx.room.Room
 import com.dirosky.asianbets.R
 import com.dirosky.asianbets.data.db.AsianBetsDatabase
 import com.dirosky.asianbets.services.MonitorService
+import com.google.android.material.floatingactionbutton.FloatingActionButton
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -29,6 +33,8 @@ class MainActivity : AppCompatActivity() {
     
     private lateinit var database: AsianBetsDatabase
     private lateinit var recyclerView: RecyclerView
+    private lateinit var emptyView: TextView
+    private lateinit var adapter: JogosAdapter
     private var currentFilter: String? = null
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,7 +52,16 @@ class MainActivity : AppCompatActivity() {
         
         // Setup RecyclerView
         recyclerView = findViewById(R.id.recyclerViewJogos)
+        emptyView = findViewById(R.id.emptyView)
+        adapter = JogosAdapter()
+        
         recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.adapter = adapter
+        
+        // FAB refresh
+        findViewById<FloatingActionButton>(R.id.fabRefresh).setOnClickListener {
+            loadJogos()
+        }
         
         // Solicitar permissão de notificações (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -65,6 +80,9 @@ class MainActivity : AppCompatActivity() {
         
         // Carregar jogos
         loadJogos()
+        
+        // Auto-refresh a cada 30 segundos
+        startAutoRefresh()
     }
     
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -82,21 +100,25 @@ class MainActivity : AppCompatActivity() {
             R.id.filter_all -> {
                 currentFilter = null
                 loadJogos()
+                Toast.makeText(this, "Mostrando todos os níveis", Toast.LENGTH_SHORT).show()
                 true
             }
             R.id.filter_a -> {
                 currentFilter = "A"
                 loadJogos()
+                Toast.makeText(this, "🔥 Filtrando: Nível A (FORTE)", Toast.LENGTH_SHORT).show()
                 true
             }
             R.id.filter_b -> {
                 currentFilter = "B"
                 loadJogos()
+                Toast.makeText(this, "🔵 Filtrando: Nível B (BOM)", Toast.LENGTH_SHORT).show()
                 true
             }
             R.id.filter_c -> {
                 currentFilter = "C"
                 loadJogos()
+                Toast.makeText(this, "📊 Filtrando: Nível C (BASE)", Toast.LENGTH_SHORT).show()
                 true
             }
             R.id.action_stats -> {
@@ -104,7 +126,6 @@ class MainActivity : AppCompatActivity() {
                 true
             }
             R.id.action_settings -> {
-                // TODO: Abrir tela de configurações
                 Toast.makeText(this, "Configurações em breve", Toast.LENGTH_SHORT).show()
                 true
             }
@@ -125,18 +146,20 @@ class MainActivity : AppCompatActivity() {
                 }
                 
                 runOnUiThread {
-                    // TODO: Atualizar adapter do RecyclerView
-                    Toast.makeText(
-                        this@MainActivity,
-                        "${filtrados.size} jogos encontrados",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    if (filtrados.isEmpty()) {
+                        recyclerView.visibility = View.GONE
+                        emptyView.visibility = View.VISIBLE
+                    } else {
+                        recyclerView.visibility = View.VISIBLE
+                        emptyView.visibility = View.GONE
+                        adapter.updateJogos(filtrados)
+                    }
                 }
             } catch (e: Exception) {
                 runOnUiThread {
                     Toast.makeText(
                         this@MainActivity,
-                        "Erro ao carregar jogos: ${e.message}",
+                        "Erro ao carregar: ${e.message}",
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -166,6 +189,15 @@ class MainActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG
                     ).show()
                 }
+            }
+        }
+    }
+    
+    private fun startAutoRefresh() {
+        lifecycleScope.launch {
+            while (true) {
+                delay(30000) // 30 segundos
+                loadJogos()
             }
         }
     }
