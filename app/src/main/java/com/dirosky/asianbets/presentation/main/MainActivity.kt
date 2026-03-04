@@ -20,6 +20,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.room.Room
 import com.dirosky.asianbets.R
 import com.dirosky.asianbets.data.db.AsianBetsDatabase
+import com.dirosky.asianbets.presentation.debug.DebugActivity
 import com.dirosky.asianbets.services.MonitorService
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +47,6 @@ class MainActivity : AppCompatActivity() {
             setContentView(R.layout.activity_main)
             Log.d(TAG, "Layout inflated successfully")
             
-            // Toolbar
             try {
                 setSupportActionBar(findViewById(R.id.toolbar))
                 Log.d(TAG, "Toolbar set")
@@ -54,7 +54,6 @@ class MainActivity : AppCompatActivity() {
                 Log.e(TAG, "Error setting toolbar", e)
             }
             
-            // Inicializar database
             try {
                 database = Room.databaseBuilder(
                     applicationContext,
@@ -68,7 +67,6 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Erro ao inicializar DB: ${e.message}", Toast.LENGTH_LONG).show()
             }
             
-            // Setup RecyclerView
             try {
                 recyclerView = findViewById(R.id.recyclerViewJogos)
                 emptyView = findViewById(R.id.emptyView)
@@ -82,7 +80,6 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Erro ao configurar lista: ${e.message}", Toast.LENGTH_LONG).show()
             }
             
-            // FAB refresh
             try {
                 findViewById<FloatingActionButton>(R.id.fabRefresh)?.setOnClickListener {
                     loadJogos()
@@ -92,7 +89,6 @@ class MainActivity : AppCompatActivity() {
                 Log.e(TAG, "Error setting up FAB", e)
             }
             
-            // Solicitar permissão de notificações (Android 13+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
                     != PackageManager.PERMISSION_GRANTED) {
@@ -104,7 +100,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             
-            // Iniciar serviço de monitoramento
             try {
                 startMonitorService()
                 Log.d(TAG, "Service started")
@@ -113,7 +108,6 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Erro ao iniciar serviço: ${e.message}", Toast.LENGTH_LONG).show()
             }
             
-            // Carregar jogos (após um delay para garantir que tudo está pronto)
             lifecycleScope.launch {
                 try {
                     kotlinx.coroutines.delay(1000)
@@ -175,11 +169,7 @@ class MainActivity : AppCompatActivity() {
                 true
             }
             R.id.action_debug -> {
-                try {
-                    startActivity(Intent(this, Class.forName("com.dirosky.asianbets.presentation.debug.DebugActivity")))
-                } catch (e: Exception) {
-                    Toast.makeText(this, "Erro ao abrir debug: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                startActivity(Intent(this, DebugActivity::class.java))
                 true
             }
             R.id.action_settings -> {
@@ -289,10 +279,4 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         database = null
     }
-}
-
-// Adicionar ao final da classe MainActivity, antes do último }
-private fun openDebug() {
-    startActivity(android.content.Intent(this, 
-        Class.forName("com.dirosky.asianbets.presentation.debug.DebugActivity")))
 }
