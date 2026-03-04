@@ -130,6 +130,12 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- DEBUG ACTIVITY -->
+        <activity
+            android:name=".presentation.debug.DebugActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:label="Debug / Diagnóstico" />
     </application>
 
 </manifest>
