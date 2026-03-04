@@ -174,6 +174,14 @@ class MainActivity : AppCompatActivity() {
                 showStats()
                 true
             }
+            R.id.action_debug -> {
+                try {
+                    startActivity(Intent(this, Class.forName("com.dirosky.asianbets.presentation.debug.DebugActivity")))
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Erro ao abrir debug: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+                true
+            }
             R.id.action_settings -> {
                 Toast.makeText(this, "Configurações em breve", Toast.LENGTH_SHORT).show()
                 true
@@ -281,4 +289,10 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         database = null
     }
+}
+
+// Adicionar ao final da classe MainActivity, antes do último }
+private fun openDebug() {
+    startActivity(android.content.Intent(this, 
+        Class.forName("com.dirosky.asianbets.presentation.debug.DebugActivity")))
 }
