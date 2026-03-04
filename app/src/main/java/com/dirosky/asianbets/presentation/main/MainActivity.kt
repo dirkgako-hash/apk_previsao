@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -21,73 +22,121 @@ import com.dirosky.asianbets.R
 import com.dirosky.asianbets.data.db.AsianBetsDatabase
 import com.dirosky.asianbets.services.MonitorService
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
     
     companion object {
+        private const val TAG = "MainActivity"
         private const val REQUEST_NOTIFICATION_PERMISSION = 100
     }
     
-    private lateinit var database: AsianBetsDatabase
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var emptyView: TextView
-    private lateinit var adapter: JogosAdapter
+    private var database: AsianBetsDatabase? = null
+    private var recyclerView: RecyclerView? = null
+    private var emptyView: TextView? = null
+    private var adapter: JogosAdapter? = null
     private var currentFilter: String? = null
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
         
-        setSupportActionBar(findViewById(R.id.toolbar))
-        
-        // Inicializar database
-        database = Room.databaseBuilder(
-            applicationContext,
-            AsianBetsDatabase::class.java,
-            "asian_bets.db"
-        ).build()
-        
-        // Setup RecyclerView
-        recyclerView = findViewById(R.id.recyclerViewJogos)
-        emptyView = findViewById(R.id.emptyView)
-        adapter = JogosAdapter()
-        
-        recyclerView.layoutManager = LinearLayoutManager(this)
-        recyclerView.adapter = adapter
-        
-        // FAB refresh
-        findViewById<FloatingActionButton>(R.id.fabRefresh).setOnClickListener {
-            loadJogos()
-        }
-        
-        // Solicitar permissão de notificações (Android 13+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
-                != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    REQUEST_NOTIFICATION_PERMISSION
-                )
+        try {
+            setContentView(R.layout.activity_main)
+            Log.d(TAG, "Layout inflated successfully")
+            
+            // Toolbar
+            try {
+                setSupportActionBar(findViewById(R.id.toolbar))
+                Log.d(TAG, "Toolbar set")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting toolbar", e)
             }
+            
+            // Inicializar database
+            try {
+                database = Room.databaseBuilder(
+                    applicationContext,
+                    AsianBetsDatabase::class.java,
+                    "asian_bets.db"
+                ).fallbackToDestructiveMigration()
+                 .build()
+                Log.d(TAG, "Database initialized")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error initializing database", e)
+                Toast.makeText(this, "Erro ao inicializar DB: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            
+            // Setup RecyclerView
+            try {
+                recyclerView = findViewById(R.id.recyclerViewJogos)
+                emptyView = findViewById(R.id.emptyView)
+                adapter = JogosAdapter()
+                
+                recyclerView?.layoutManager = LinearLayoutManager(this)
+                recyclerView?.adapter = adapter
+                Log.d(TAG, "RecyclerView configured")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting up RecyclerView", e)
+                Toast.makeText(this, "Erro ao configurar lista: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            
+            // FAB refresh
+            try {
+                findViewById<FloatingActionButton>(R.id.fabRefresh)?.setOnClickListener {
+                    loadJogos()
+                }
+                Log.d(TAG, "FAB configured")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting up FAB", e)
+            }
+            
+            // Solicitar permissão de notificações (Android 13+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
+                    != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                        REQUEST_NOTIFICATION_PERMISSION
+                    )
+                }
+            }
+            
+            // Iniciar serviço de monitoramento
+            try {
+                startMonitorService()
+                Log.d(TAG, "Service started")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting service", e)
+                Toast.makeText(this, "Erro ao iniciar serviço: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            
+            // Carregar jogos (após um delay para garantir que tudo está pronto)
+            lifecycleScope.launch {
+                try {
+                    kotlinx.coroutines.delay(1000)
+                    loadJogos()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error loading initial games", e)
+                }
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Critical error in onCreate", e)
+            Toast.makeText(this, "Erro crítico: ${e.message}", Toast.LENGTH_LONG).show()
         }
-        
-        // Iniciar serviço de monitoramento
-        startMonitorService()
-        
-        // Carregar jogos
-        loadJogos()
-        
-        // Auto-refresh a cada 30 segundos
-        startAutoRefresh()
     }
     
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.main_menu, menu)
-        return true
+        return try {
+            menuInflater.inflate(R.menu.main_menu, menu)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error creating menu", e)
+            false
+        }
     }
     
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -100,25 +149,25 @@ class MainActivity : AppCompatActivity() {
             R.id.filter_all -> {
                 currentFilter = null
                 loadJogos()
-                Toast.makeText(this, "Mostrando todos os níveis", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Todos os níveis", Toast.LENGTH_SHORT).show()
                 true
             }
             R.id.filter_a -> {
                 currentFilter = "A"
                 loadJogos()
-                Toast.makeText(this, "🔥 Filtrando: Nível A (FORTE)", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "🔥 Nível A", Toast.LENGTH_SHORT).show()
                 true
             }
             R.id.filter_b -> {
                 currentFilter = "B"
                 loadJogos()
-                Toast.makeText(this, "🔵 Filtrando: Nível B (BOM)", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "🔵 Nível B", Toast.LENGTH_SHORT).show()
                 true
             }
             R.id.filter_c -> {
                 currentFilter = "C"
                 loadJogos()
-                Toast.makeText(this, "📊 Filtrando: Nível C (BASE)", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "📊 Nível C", Toast.LENGTH_SHORT).show()
                 true
             }
             R.id.action_stats -> {
@@ -136,31 +185,43 @@ class MainActivity : AppCompatActivity() {
     private fun loadJogos() {
         lifecycleScope.launch {
             try {
-                val hoje = LocalDate.now().toString()
-                val jogos = database.jogoDao().getJogosByData(hoje)
-                
-                val filtrados = if (currentFilter != null) {
-                    jogos.filter { it.nivel == currentFilter }
-                } else {
-                    jogos
-                }
-                
-                runOnUiThread {
-                    if (filtrados.isEmpty()) {
-                        recyclerView.visibility = View.GONE
-                        emptyView.visibility = View.VISIBLE
+                withContext(Dispatchers.IO) {
+                    val hoje = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        java.time.LocalDate.now().toString()
                     } else {
-                        recyclerView.visibility = View.VISIBLE
-                        emptyView.visibility = View.GONE
-                        adapter.updateJogos(filtrados)
+                        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                            .format(java.util.Date())
+                    }
+                    
+                    Log.d(TAG, "Loading games for: $hoje")
+                    
+                    val jogos = database?.jogoDao()?.getJogosByData(hoje) ?: emptyList()
+                    Log.d(TAG, "Found ${jogos.size} games")
+                    
+                    val filtrados = if (currentFilter != null) {
+                        jogos.filter { it.nivel == currentFilter }
+                    } else {
+                        jogos
+                    }
+                    
+                    withContext(Dispatchers.Main) {
+                        if (filtrados.isEmpty()) {
+                            recyclerView?.visibility = View.GONE
+                            emptyView?.visibility = View.VISIBLE
+                        } else {
+                            recyclerView?.visibility = View.VISIBLE
+                            emptyView?.visibility = View.GONE
+                            adapter?.updateJogos(filtrados)
+                        }
                     }
                 }
             } catch (e: Exception) {
-                runOnUiThread {
+                Log.e(TAG, "Error loading games", e)
+                withContext(Dispatchers.Main) {
                     Toast.makeText(
                         this@MainActivity,
-                        "Erro ao carregar: ${e.message}",
-                        Toast.LENGTH_LONG
+                        "Erro: ${e.message}",
+                        Toast.LENGTH_SHORT
                     ).show()
                 }
             }
@@ -170,44 +231,54 @@ class MainActivity : AppCompatActivity() {
     private fun showStats() {
         lifecycleScope.launch {
             try {
-                val hoje = LocalDate.now().toString()
-                val total = database.jogoDao().countJogos(hoje)
-                val apostas = database.jogoDao().countApostas(hoje)
-                
-                runOnUiThread {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "📊 Total: $total jogos | 🎯 Apostas: $apostas",
-                        Toast.LENGTH_LONG
-                    ).show()
+                withContext(Dispatchers.IO) {
+                    val hoje = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        java.time.LocalDate.now().toString()
+                    } else {
+                        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                            .format(java.util.Date())
+                    }
+                    
+                    val total = database?.jogoDao()?.countJogos(hoje) ?: 0
+                    val apostas = database?.jogoDao()?.countApostas(hoje) ?: 0
+                    
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "📊 Total: $total | 🎯 Apostas: $apostas",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             } catch (e: Exception) {
-                runOnUiThread {
+                Log.e(TAG, "Error showing stats", e)
+                withContext(Dispatchers.Main) {
                     Toast.makeText(
                         this@MainActivity,
                         "Erro: ${e.message}",
-                        Toast.LENGTH_LONG
+                        Toast.LENGTH_SHORT
                     ).show()
                 }
-            }
-        }
-    }
-    
-    private fun startAutoRefresh() {
-        lifecycleScope.launch {
-            while (true) {
-                delay(30000) // 30 segundos
-                loadJogos()
             }
         }
     }
     
     private fun startMonitorService() {
-        val intent = Intent(this, MonitorService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
+        try {
+            val intent = Intent(this, MonitorService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+            Log.d(TAG, "Monitor service started")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start monitor service", e)
         }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        database = null
     }
 }
